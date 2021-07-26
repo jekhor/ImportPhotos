@@ -306,8 +306,6 @@ class ImportPhotos:
 
     def toolButtonImport(self):
         self.directoryPhotos = QFileDialog.getExistingDirectory(caption = self.tr('Select a folder:'), options = QFileDialog.ShowDirsOnly)
-        self.selected_folder = self.directoryPhotos[:]
-        self.selected_folder = './' + os.path.basename(os.path.normpath(self.selected_folder)) + '/'
         self.dlg.imp.setText(self.directoryPhotos)
 
     def loadstyle(self):
@@ -354,6 +352,9 @@ class ImportPhotos:
 
         self.outputPath = self.dlg.out.text()
         self.directoryPhotos = self.dlg.imp.text()
+
+        self.selected_folder = self.directoryPhotos[:]
+        self.selected_folder = './' + os.path.basename(os.path.normpath(self.selected_folder)) + '/'
 
         if self.dlg.input_load_style.text() == '':
             self.load_style = os.path.join(self.plugin_dir, 'icons', "photos.qml")
