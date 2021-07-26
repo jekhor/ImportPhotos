@@ -35,14 +35,14 @@ from . import resources
 from .code.MouseClick import MouseClick
 import os
 import platform
-import uuid
 import json
 
+import traceback
 
 # Import python module
 CHECK_MODULE = ''
 try:
-    import exifread
+    from .import exif_exifread
     CHECK_MODULE = 'exifread'
 except:
     pass
@@ -57,12 +57,10 @@ except:
 
 try:
     if CHECK_MODULE == '':
-        from PIL import Image
-        from PIL.ExifTags import TAGS
+        from . import exif_PIL
         CHECK_MODULE = 'PIL'
 except:
     pass
-
 
 #FORM_CLASS, _ = uic.loadUiType(os.path.join(
 #    os.path.dirname(__file__), 'ui/impphotos.ui'))
@@ -570,163 +568,16 @@ class ImportPhotos:
         self.lat = []
         for count, imgpath in enumerate(self.photos):
             try:
-                name = os.path.basename(imgpath)
                 RelPath = self.selected_folder + self.photos_names[count]
                 ImagesSrc = '<img src = "' + RelPath + '" width="300" height="225"/>'
-                if CHECK_MODULE == 'exifread' and not self.pil_module:
-                    self.exifread_module = True
-                    self.taskPhotos.setProgress(count/self.initphotos)
-                    with open(imgpath, 'rb') as imgpathF:
-                        tags = exifread.process_file(imgpathF, details=False)
-                    if not tags.keys() & {"GPS GPSLongitude", "GPS GPSLatitude"}:
-                        continue
 
-                    lat, lon = self.get_exif_location(tags, "lonlat")
-                    try:
-                        if 'GPS GPSAltitude' in tags:
-                            altitude = float(tags["GPS GPSAltitude"].values[0].num) / float(
-                                tags["GPS GPSAltitude"].values[0].den)
-                        else:
-                            altitude = ''
-                    except:
-                        altitude = ''
-                    uuid_ = str(uuid.uuid4())
+                self.taskPhotos.setProgress(count/self.initphotos)
 
-                    try:
-                        dt1, dt2 = tags["EXIF DateTimeOriginal"].values.split(' ')
-                        date = dt1.replace(':', '/')
-                        time_ = dt2
-                        timestamp = dt1.replace(':', '-') + 'T' + time_
-                    except:
-                        try:
-                            date = tags["GPS GPSDate"].values.replace(':', '/')
-                            tt = [str(i) for i in tags["GPS GPSTimeStamp"].values]
-                            time_ = "{:0>2}:{:0>2}:{:0>2}".format(tt[0], tt[1], tt[2])
-                            timestamp = tags["GPS GPSDate"].values.replace(':', '-') + 'T' + time_
-                        except:
-                            date = ''
-                            time_ = ''
-                            timestamp = ''
+                if CHECK_MODULE == 'exifread':
+                    lon, lat, geo_info = exif_exifread.get_geo_info(imgpath, RelPath, ImagesSrc)
 
-                    try:
-                        if 'GPS GPSImgDirection' in tags:
-                            azimuth = float(tags["GPS GPSImgDirection"].values[0].num) / float(
-                                tags["GPS GPSImgDirection"].values[0].den)
-                        else:
-                            azimuth = ''
-                    except:
-                        azimuth = ''
-
-                    try:
-                        if 'GPS GPSImgDirectionRef' in tags:
-                            north = str(tags["GPS GPSImgDirectionRef"].values)
-                        else:
-                            north = ''
-                    except:
-                        north = ''
-
-                    try:
-                        if 'Image Make' in tags:
-                           maker = tags['Image Make']
-                        else:
-                            maker = ''
-                    except:
-                        maker = ''
-
-                    try:
-                        if 'Image Model' in tags:
-                            model = tags['Image Model']
-                        else:
-                            model = ''
-                    except:
-                        model = ''
-
-                    try:
-                        if 'Image ImageDescription' in tags:
-                            title = tags['Image ImageDescription']
-                        else:
-                            title = ''
-                    except:
-                        title = ''
-
-                    try:
-                        if 'EXIF UserComment' in tags:
-                            user_comm = tags['EXIF UserComment'].printable
-                        else:
-                            user_comm = ''
-                    except:
-                        user_comm = ''
-
-                if CHECK_MODULE == 'PIL' and not self.exifread_module:
-                    self.pil_module = True
-                    a = {}
-                    info = Image.open(imgpath)
-                    info = info._getexif()
-
-                    if info == None:
-                        continue
-
-                    for tag, value in info.items():
-                        if TAGS.get(tag, tag) == 'GPSInfo' or TAGS.get(tag, tag) == 'DateTime' or TAGS.get(tag,
-                                                                                                           tag) == 'DateTimeOriginal':
-                            a[TAGS.get(tag, tag)] = value
-
-                    if a == {}:
-                        continue
-
-                    if a['GPSInfo'] != {}:
-                        if 1 and 2 and 3 and 4 in a['GPSInfo']:
-                            lat = [float(x) / float(y) for x, y in a['GPSInfo'][2]]
-                            latref = a['GPSInfo'][1]
-                            lon = [float(x) / float(y) for x, y in a['GPSInfo'][4]]
-                            lonref = a['GPSInfo'][3]
-
-                            lat = lat[0] + lat[1] / 60 + lat[2] / 3600
-                            lon = lon[0] + lon[1] / 60 + lon[2] / 3600
-
-                            if latref == 'S':
-                                lat = -lat
-                            if lonref == 'W':
-                                lon = -lon
-                        else:
-                            continue
-
-                        uuid_ = str(uuid.uuid4())
-                        if 'DateTime' or 'DateTimeOriginal' in a:
-                            if 'DateTime' in a:
-                                dt1, dt2 = a['DateTime'].split()
-                            if 'DateTimeOriginal' in a:
-                                dt1, dt2 = a['DateTimeOriginal'].split()
-                            date = dt1.replace(':', '/')
-                            time_ = dt2
-                            timestamp = dt1.replace(':', '-') + 'T' + time_
-
-                        try:
-                            if 6 in a['GPSInfo']:
-                                if len(a['GPSInfo'][6]) > 1:
-                                    mAltitude = float(a['GPSInfo'][6][0])
-                                    mAltitudeDec = float(a['GPSInfo'][6][1])
-                                    altitude = mAltitude / mAltitudeDec
-                            else:
-                                altitude = ''
-                        except:
-                            altitude = ''
-
-                        try:
-                            if 16 and 17 in a['GPSInfo']:
-                                north = str(a['GPSInfo'][16])
-                                azimuth = float(a['GPSInfo'][17][0]) / float(a['GPSInfo'][17][1])
-                            else:
-                                north = ''
-                                azimuth = ''
-                        except:
-                            north = ''
-                            azimuth = ''
-
-                        maker = ''
-                        model = ''
-                        user_comm = ''
-                        title = ''
+                if CHECK_MODULE == 'PIL':
+                    lon, lat, geo_info = exif_PIL.get_geo_info(imgpath, RelPath, ImagesSrc)
 
                 if self.dlg.canvas_extent.isChecked():
                     if not (self.canvas.extent().xMaximum() > lon > self.canvas.extent().xMinimum() \
@@ -739,15 +590,6 @@ class ImportPhotos:
 
                 self.truePhotosCount = self.truePhotosCount + 1
 
-                geo_info = {"type": "Feature",
-                            "properties": {'ID': uuid_, 'Name': name, 'Date': date, 'Time': time_,
-                                           'Lon': lon,
-                                           'Lat': lat, 'Altitude': altitude, 'North': north,
-                                           'Azimuth': azimuth,
-                                           'Camera Maker': str(maker), 'Camera Model': str(model), 'Title': str(title),
-                                           'Comment': user_comm,'Path': imgpath, 'RelPath': RelPath,
-                                           'Timestamp': timestamp, 'Images': ImagesSrc},
-                            "geometry": {"coordinates": [lon, lat], "type": "Point"}}
                 self.geoPhotos.append(geo_info)
 
                 if self.taskPhotos.isCanceled():
@@ -755,7 +597,8 @@ class ImportPhotos:
                     self.taskPhotos.destroyed()
                     return None
             except:
-                pass
+                traceback.print_exc()
+
         return True
 
     def call_import_photos(self):
@@ -765,51 +608,3 @@ class ImportPhotos:
                                  on_finished=self.completed, wait_time=4)
         QgsApplication.taskManager().addTask(self.taskPhotos)
 
-    ######################################################
-    # based on http://www.codegists.com/snippet/python/exif_gpspy_snakeye_python
-
-    def _get_if_exist(self, data, key):
-        if key in data:
-            return data[key]
-
-        return None
-
-
-    def _convert_to_degress(self, value):
-        """
-        Helper function to convert the GPS coordinates stored in the EXIF to degress in float format
-
-        :param value:
-        :type value: exifread.utils.Ratio
-        :rtype: float
-        """
-        d = float(value.values[0].num) / float(value.values[0].den)
-        m = float(value.values[1].num) / float(value.values[1].den)
-        s = float(value.values[2].num) / float(value.values[2].den)
-
-        return d + (m / 60.0) + (s / 3600.0)
-
-
-    def get_exif_location(self, exif_data, lonlat):
-        """
-        Returns the latitude and longitude, if available, from the provided exif_data (obtained through get_exif_data above)
-        """
-
-        if lonlat=='lonlat':
-            lat = ''
-            lon = ''
-            gps_latitude = self._get_if_exist(exif_data, 'GPS GPSLatitude')
-            gps_latitude_ref = self._get_if_exist(exif_data, 'GPS GPSLatitudeRef')
-            gps_longitude = self._get_if_exist(exif_data, 'GPS GPSLongitude')
-            gps_longitude_ref = self._get_if_exist(exif_data, 'GPS GPSLongitudeRef')
-
-            if gps_latitude and gps_latitude_ref and gps_longitude and gps_longitude_ref:
-                lat = self._convert_to_degress(gps_latitude)
-                if gps_latitude_ref.values[0] != 'N':
-                    lat = 0 - lat
-
-                lon = self._convert_to_degress(gps_longitude)
-                if gps_longitude_ref.values[0] != 'E':
-                    lon = 0 - lon
-
-            return lat, lon
