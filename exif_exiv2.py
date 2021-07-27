@@ -112,6 +112,19 @@ def get_geo_info(imgpath, RelPath, ImagesSrc):
         except:
             xmp_tags[k] = str(md[k].value)
 
+    # Calculate camera azimuth based on info about drone and gimbal yaw angles
+    if not azimuth and 'Xmp.drone-dji.FlightYawDegree' in md.xmp_keys:
+        azimuth = float(md['Xmp.drone-dji.FlightYawDegree'].value) + 180.0
+
+        if 'Xmp.drone-dji.GimbalYawDegree' in md.xmp_keys:
+            azimuth += float(md['Xmp.drone-dji.GimbalYawDegree'].value) + 180.0
+
+        if azimuth > 360:
+            azimuth -= 360
+
+        north = 'T'
+
+
     geo_info = {
             "type": "Feature",
             "properties": {'ID': uuid_, 'Name': name, 'Date': date, 'Time': time_,
