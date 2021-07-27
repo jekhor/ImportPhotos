@@ -37,13 +37,27 @@ import os
 import platform
 import json
 
+import logging
 import traceback
 
-# Import python module
 CHECK_MODULE = ''
+get_geo_info = None
+
+# Import python module
 try:
-    from .import exif_exifread
-    CHECK_MODULE = 'exifread'
+    if CHECK_MODULE == '':
+        from . import exif_exiv2
+        CHECK_MODULE = 'exiv2'
+        get_geo_info = exif_exiv2.get_geo_info
+except:
+    traceback.print_exc()
+    pass
+
+try:
+    if CHECK_MODULE == '':
+        from .import exif_exifread
+        CHECK_MODULE = 'exifread'
+        get_geo_info = exif_exifread.get_geo_info
 except:
     pass
 
@@ -59,8 +73,11 @@ try:
     if CHECK_MODULE == '':
         from . import exif_PIL
         CHECK_MODULE = 'PIL'
+        get_geo_info = exif_PIL.get_geo_info
 except:
     pass
+
+QgsMessageLog.logMessage("ImportPhotos: Use EXIF reader: " + CHECK_MODULE, level=Qgis.Info)
 
 #FORM_CLASS, _ = uic.loadUiType(os.path.join(
 #    os.path.dirname(__file__), 'ui/impphotos.ui'))
@@ -469,9 +486,14 @@ class ImportPhotos:
                    "crs": {"type": "name", "properties": {"name": "crs:OGC:1.3:CRS84"}},
                    "features": self.geoPhotos}
 
-        geofile = open(self.outDirectoryPhotosGeoJSON, 'w')
-        json.dump(geojson, geofile)
-        geofile.close()
+        try:
+            geofile = open(self.outDirectoryPhotosGeoJSON, 'w')
+            json.dump(geojson, geofile)
+            geofile.close()
+        except:
+            QgsMessageLog.logMessage(traceback.format_exc(), level=Qgis.Critical)
+            raise
+
         del self.geoPhotos, geojson
 
         try:
@@ -480,13 +502,18 @@ class ImportPhotos:
                     self.Qpr_inst.instance().removeMapLayer(layer.id())
                     os.remove(self.outputPath)
         except:
+            traceback.print_exc()
             pass
 
-        self.layerPhotos = QgsVectorLayer(self.outDirectoryPhotosGeoJSON, self.lphoto, "ogr")
-        QgsVectorFileWriter.writeAsVectorFormat(self.layerPhotos, self.outputPath, "utf-8",
-                                                    QgsCoordinateReferenceSystem(self.layerPhotos.crs().authid()),
-                                                    self.outputDriver)
-        self.layerPhotos_final = QgsVectorLayer(self.outputPath, self.lphoto, "ogr")
+        try:
+            self.layerPhotos = QgsVectorLayer(self.outDirectoryPhotosGeoJSON, self.lphoto, "ogr")
+            QgsVectorFileWriter.writeAsVectorFormat(self.layerPhotos, self.outputPath, "utf-8",
+                                                        QgsCoordinateReferenceSystem(self.layerPhotos.crs().authid()),
+                                                        self.outputDriver)
+            self.layerPhotos_final = QgsVectorLayer(self.outputPath, self.lphoto, "ogr")
+        except:
+            traceback.print_exc()
+            raise
 
         # clear temp.geojson file
         try:
@@ -573,11 +600,7 @@ class ImportPhotos:
 
                 self.taskPhotos.setProgress(count/self.initphotos)
 
-                if CHECK_MODULE == 'exifread':
-                    lon, lat, geo_info = exif_exifread.get_geo_info(imgpath, RelPath, ImagesSrc)
-
-                if CHECK_MODULE == 'PIL':
-                    lon, lat, geo_info = exif_PIL.get_geo_info(imgpath, RelPath, ImagesSrc)
+                lon, lat, geo_info = get_geo_info(imgpath, RelPath, ImagesSrc)
 
                 if self.dlg.canvas_extent.isChecked():
                     if not (self.canvas.extent().xMaximum() > lon > self.canvas.extent().xMinimum() \
@@ -597,7 +620,7 @@ class ImportPhotos:
                     self.taskPhotos.destroyed()
                     return None
             except:
-                traceback.print_exc()
+                QgsMessageLog.logMessage(traceback.format_exc(), level=Qgis.Warning)
 
         return True
 
