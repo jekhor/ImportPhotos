@@ -50,6 +50,7 @@ def get_geo_info(imgpath, RelPath, ImagesSrc):
     model = ''
     title = ''
     user_comm = ''
+    focal_length_35mm = None
     xmp_tags = {}
 
     md = pyexiv2.ImageMetadata(imgpath)
@@ -106,6 +107,11 @@ def get_geo_info(imgpath, RelPath, ImagesSrc):
     except:
         pass
 
+    try:
+        focal_length_35mm = md['Exif.Photo.FocalLengthIn35mmFilm'].value
+    except:
+        pass
+
     for k in md.xmp_keys:
         try:
             xmp_tags[k] = float(md[k].value)
@@ -132,6 +138,7 @@ def get_geo_info(imgpath, RelPath, ImagesSrc):
                 'Lat': lat, 'Altitude': altitude, 'North': north,
                 'Azimuth': azimuth,
                 'Camera Maker': maker, 'Camera Model': model, 'Title': title,
+                'FocalLength35mm': focal_length_35mm,
                 'Comment': user_comm,'Path': imgpath, 'RelPath': RelPath,
                 'Timestamp': timestamp, 'Images': ImagesSrc
                 },
